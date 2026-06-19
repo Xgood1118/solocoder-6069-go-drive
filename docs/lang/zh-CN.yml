@@ -1,0 +1,305 @@
+error:
+  not_found: 资源不存在
+  not_allowed: 不允许的操作
+  permission_denied: 资源不存在或权限不足
+  fail_ban_message: 失败次数过多，请稍后再试
+util:
+  request_failed: "[{{ 1 }}] 请求失败"
+oauth:
+  state_mismatch: state 不匹配
+search:
+  invalid_query: 无效的查询
+api:
+  admin:
+    unknown_drive_type: 未知的 Drive 类型 '{{ 1 }}'
+    invalid_drive_name: 无效的 Drive 名称 '{{ 1 }}'
+    invalid_file_bucket_name: 无效的名称 '{{ 1 }}'
+  auth:
+    invalid_username_or_password: 用户名或密码错误
+    group_permission_required: 需要 '{{ 1 }}' 用户组权限
+  drive:
+    copy_to_same_path_not_allowed: 不允许复制到相同的路径
+    copy_to_child_path_not_allowed: 不允许复制到子路径
+    invalid_file_size: 无效的文件大小
+    invalid_size_or_chunk_size: 无效的文件大小或分片大小
+  chunk_uploader:
+    invalid_file_size: 无效的文件大小
+    invalid_chunk_seq: 无效的分片序号
+    chunk_size_cannot_less_than: 分片不可小于 {{ 1 }}
+    expected__bytes_but__bytes: 预期读取 {{ 1 }} bytes, 但实际读取了 {{ 2 }} bytes
+    missing_chunks: 缺失分片
+    invalid_upload_id: 无效的分片上传
+  mem_token:
+    invalid_token: 无效的 token
+  file_token:
+    invalid_token: 无效的 token
+  permission_wrapper:
+    no_subfolder_permission: 你可能没有子路径的操作权限
+  thumbnail:
+    file_too_large: 文件过大无法创建缩略图
+    image_too_large: 图片过大无法创建缩略图
+    create_failed: 无法创建缩略图
+  zip:
+    size_exceed: 超过最大允许的大小 {{ 1 }}
+storage:
+  drives:
+    drive_exists: Drive '{{ 1 }}' 已存在
+  groups:
+    group_not_exists: 用户组 '{{ 1 }}' 不存在
+    group_exists: 用户组 '{{ 1 }}' 已存在
+  users:
+    user_not_exists: 用户 '{{ 1 }}' 不存在
+    user_exists: 用户 '{{ 1 }}' 已存在
+  file_bucket:
+    bucket_exists: "'{{ 1 }}' 已存在"
+drive:
+  not_configured: Drive 还未配置完成
+  copy_type_mismatch1: 目的路径 '{{ 2 }}' 是一个文件, 但源路径 '{{ 1 }}' 是一个文件夹
+  copy_type_mismatch2: 目的路径 '{{ 2 }}' 是一个文件夹, 但源路径 '{{ 1 }}' 是一个文件
+  file_exists: 文件已存在
+  file_not_exists: 文件不存在
+  invalid_path: 无效的路径
+  file_not_downloadable: 无法下载这个文件
+  path_meta:
+    incorrect_password: 密码不正确
+  root:
+    invalid_drive_type: 无效的 Drive 类型 '{{ 1 }}'
+    invalid_drive_config: Drive '{{ 1 }}' 的配置有问题
+    error_create_drive: "创建 Drive '{{ 1 }}' 时出现错误: {{ 2 }}"
+  dispatcher:
+    move_across_not_supported: 不支持跨 Drive 移动文件
+  gdrive:
+    name: Google Drive
+    readme: Google Drive, 请参阅 [配置 Google Drive](https://go-drive.top/drives/google-drive)
+    form:
+      client_id:
+        label: 客户端 ID
+        description: ""
+      client_secret:
+        label: 客户端密钥
+        description: ""
+      cache_ttl:
+        label: 缓存生命周期
+        description: 有效单位为 'ms', 's', 'm', 'h', 如果省略则没有缓存
+      proxy_thumbnail:
+        label: 代理缩略图
+        description: 如果缩略图无法正常显示，尝试开启此选项
+    oauth_text: 连接到 Google Drive
+    drive_label: Drive
+    my_drive_name: My Drive
+  onedrive:
+    name: OneDrive
+    readme: OneDrive, 请参阅 [配置 OneDrive](https://go-drive.top/drives/onedrive)
+    form:
+      site:
+        label: 账号类型
+        description: ""
+        global: 国际版
+        china: 世纪互联版
+      tenant:
+        label: 租户模式
+        description: ""
+        common: 适用于 Microsoft 帐户和工作或学校帐户
+        organizations: 仅适用于工作或学校帐户
+        consumers: 仅适用于 Microsoft 帐户
+      client_id:
+        label: 客户端 ID
+        description: ""
+      client_secret:
+        label: 客户端密钥
+        description: ""
+      share_point:
+        label: SharePoint URL
+        description: 可选，如果你想将文件存储在 SharePoint 站点中
+      proxy_in:
+        label: 上传代理
+        description: 上传时是否经过服务器代理
+      proxy_out:
+        label: 下载代理
+        description: 下载时是否经过服务器代理
+      cache_ttl:
+        label: 缓存生命周期
+        description: 有效单位为 'ms', 's', 'm', 'h', 如果省略则没有缓存
+    drive_not_selected: OneDrive 尚未配置完成或者获取 SharePoint 站点失败
+    oauth_text: 连接到 OneDrive
+    drive_select: 选择 Drive
+    drive_desc: "{{ 1 }} ({{ 2 }} / {{ 3 }} | {{ 4 }} 已使用)"
+    unexpected_status: 未预期的状态码 {{ 1 }}
+    unknown_action_status: "未知的状态: {{ 1 }}"
+  fs:
+    name: 本地文件
+    readme: 本地文件系统
+    form:
+      path:
+        label: 根目录
+        description: 根目录路径
+    invalid_root_path: 无效的根目录
+    root_path_not_exists: 根目录不存在
+    cannot_list_file: 无效文件类型
+    cannot_delete_root: 无法删除根路径
+  s3:
+    name: S3
+    readme: S3 兼容协议
+    form:
+      ak:
+        label: AccessKey
+        description: ""
+      sk:
+        label: SecretKey
+        description: ""
+      bucket:
+        label: Bucket
+        description: ""
+      path_style:
+        label: PathStyle
+        description: 强制使用路径形式的 API
+      region:
+        label: 区域(Region)
+        description: ""
+      endpoint:
+        label: Endpoint
+        description: API 端点
+      proxy_in:
+        label: 上传代理
+        description: 上传时是否经过服务器代理
+      proxy_out:
+        label: 下载代理
+        description: 下载时是否经过服务器代理
+      cache_ttl:
+        label: 缓存生命周期
+        description: 有效单位为 'ms', 's', 'm', 'h', 如果省略则没有缓存
+    bucket_not_exists: Bucket '{{ 1 }}' 不存在
+  webdav:
+    name: WebDAV
+    readme: WebDAV 协议
+    form:
+      url:
+        label: URL
+        description: 根路径 URL
+      username:
+        label: 用户名
+        description: 如果省略，则表示无需认证
+      password:
+        label: 密码
+        description: ""
+      cache_ttl:
+        label: 缓存生命周期
+        description: 有效单位为 'ms', 's', 'm', 'h', 如果省略则没有缓存
+    wrong_user_or_password: 用户名或密码不正确
+    remote_error: "远程服务错误: {{ 1 }}"
+  ftp:
+    name: FTP
+    readme: FTP drive
+    form:
+      host:
+        label: 主机
+        description: ""
+      port:
+        label: 端口号
+        description: ""
+      user:
+        label: 用户
+        description: 用户名，默认为 'anonymous'
+      password:
+        label: 密码
+        description: 密码， 默认为 'anonymous'
+      concurrent:
+        label: 并发连接数
+        description: 最大并发连接数，默认 5 个
+      timeout:
+        label: 超时时间
+        description: 默认 5 秒， 有效单位为 'ms', 's', 'm', 'h'
+      cache_ttl:
+        label: 缓存生命周期
+        description: 有效单位为 'ms', 's', 'm', 'h', 如果省略则没有缓存
+  sftp:
+    name: SFTP
+    readme: SFTP drive <br/> @[Vgbhfive](https://blog.vgbhfive.cn)
+    form:
+      host:
+        label: 主机
+        description: ""
+      port:
+        label: 端口号
+        description: "默认为 22"
+      user:
+        label: 用户
+        description: 用户名
+      password:
+        label: 密码
+        description: 用于登录认证的密码，密码和私钥必须任选其一
+      priv_key:
+        label: 私钥
+        description: |
+          用于登录认证的私钥，如 -----BEGIN RSA PRIVATE KEY-----，暂不支持加密的私钥，私钥和密码必须任选其一
+      host_key:
+        label: HostKey
+        description: 用于主机身份校验(可选)
+      root_path:
+        label: 根路径
+        description: "根路径，默认为 '/'"
+      cache_ttl:
+        label: 缓存生命周期
+        description: 有效单位为 'ms', 's', 'm', 'h', 如果省略则没有缓存
+    invalid_root_path: "根路径必须以 '/' 开头"
+  script:
+    name: 脚本
+    readme: 使用 JavaScript 驱动盘。请保存后在下方进行具体配置
+    invalid_pool_config: "无效的 Pool 配置: {{ 1 }}"
+    form:
+      pool:
+        label: Pool
+        description: JavaScript 运行时池配置，格式为 'MaxTotal,MaxIdle,MinIdle,IdleTime'，默认值为：'100,50,10,30m'。详情请见 https://pkg.go.dev/github.com/jolestar/go-commons-pool#ObjectPoolConfig
+      script:
+        label: 脚本文件
+        description: 选择 scripts 文件夹中的脚本
+stat:
+  task:
+    total: 总计
+    pending: 等待中
+    running: 运行中
+    done: 已完成
+    error: 错误
+    canceled: 已取消
+jobs:
+  copy:
+    name: 复制
+    desc: 复制文件
+    src: 源路径
+    src_desc: 源路径（每行一个），支持通配符
+    dest: 目的路径
+    dest_desc: 必须存在且是文件夹
+    override: 覆盖
+    override_desc: 复制时遇到同名文件是否覆盖，否则会自动重命名
+    move: 移动
+    move_desc: 移动文件，而不是复制
+  delete:
+    name: 删除
+    desc: 删除文件
+    paths: 路径
+    paths_desc: 待删除的路径（每行一个），支持通配符
+  flow:
+    name: 组合
+    desc: 将多个操作按顺序执行
+    add_text: 添加操作
+    ignore_err: 忽略错误
+    ignore_err_desc: 当这个操作执行失败时，忽略错误继续向下执行
+  script:
+    name: 脚本
+    desc: 执行 JavaScript 脚本
+    code: 代码
+    code_desc: JavaScript 代码
+  trigger:
+    cron:
+      name: 定时
+      desc: 按 Cron 表达式定时执行
+      schedule: 表达式
+      schedule_desc: "Cron 表达式（参考 https://crontab.cronhub.io/）"
+    entry:
+      name: 文件/目录
+      desc: 当文件或目录被创建、更新或删除时执行
+      path_pattern: 路径匹配
+      path_pattern_desc: "Glob 路径匹配，路径不以 / 开头\n** 匹配零个或多个目录；\n* 匹配任意个数的非目录分隔符字符；\n? 匹配单个非目录分隔符字符。"
+      event_types: 事件类型
+      event_entry_updated: 更新时
+      event_entry_deleted: 删除时

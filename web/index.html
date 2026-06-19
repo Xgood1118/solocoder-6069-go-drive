@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="same-origin" />
+    <link rel="icon" href="/favicon.png?t=<%= Date.now() %>" />
+    <title><%- mode === 'production' ? '{{ (.Options.Get "app.name") }}' : 'Drive' %></title>
+    <link rel="stylesheet" href="/static/iconfont/iconfont.css?t=<%= Date.now() %>" />
+    <% if (mode === 'production') { %>
+    <script>
+      var ___config___ = {
+        api: JSON.parse('{{ .Json (.Config.APIPath) }}'),
+        appName: JSON.parse('{{ .Json (.Options.Get "app.name") }}'),
+        version: JSON.parse('{{ .Json (.Config.Version) }}'),
+      }
+    </script>
+    <script id="app-style" type="text/plain">{{ (.Options.Get "app.styles") }}</script>
+    <script id="app-script" type="text/plain">{{ (.Options.Get "app.scripts") }}</script>
+    <script id="app-init-script">(function (d,z,y,x,v,s){function a(i,t,n){t=d[x]("app-"+i);n=d.createElement(i);n[z]=t[z];d.head.appendChild(n);t[v][y](t)}a("style");a("script");s=d[x]("app-init-script");s[v][y](s)})(document,"innerHTML","removeChild","getElementById","parentElement")</script>
+    <% } else { %>
+    <script>
+      var ___config___ = {
+        api: '/api',
+        appName: 'Drive',
+        version: '',
+      }
+    </script>
+    <% } %> <% if (mode === 'development' && typeof (VITE_DEBUG_API) ===
+    'string') { %>
+    <script>
+      ___config___.api = '<%= VITE_DEBUG_API %>'
+    </script>
+    <% } %>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+    <script src="/static/iconfont/iconfont.js?t=<%= Date.now() %>"></script>
+  </body>
+</html>

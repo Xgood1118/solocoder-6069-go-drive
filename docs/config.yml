@@ -1,0 +1,163 @@
+# The application will listen at this address
+listen: :8089
+
+# Trusted proxy IPs or CIDRs.
+# When set, Gin will only trust X-Forwarded-For headers from these sources
+# to determine the client IP. This is important for IP-based rate limiting
+# and logging to work correctly.
+# When empty or not set (default), proxy headers are NOT trusted and
+# ClientIP() returns the direct remote address (most secure default).
+# If go-drive is running behind a reverse proxy (e.g. Nginx), you MUST
+# configure this to include the proxy's IP/CIDR, otherwise the real
+# client IP will not be recognized.
+#trusted-proxies:
+#  - 127.0.0.1
+#  - 10.0.0.0/8
+#  - 172.16.0.0/12
+#  - 192.168.0.0/16
+
+db:
+  # database type: currently supports sqlite, mysql
+  type: sqlite
+  # database name
+  # for sqlite: the filename
+  # for mysql: the database name
+  name: data.db
+  # database host, for mysql only
+  #host: 127.0.0.1
+  # database port, for mysql only
+  #port: 3306
+  # database username, for mysql only
+  #user: user
+  # database password, for mysql only
+  #password: password
+  # some special parameters, see https://gorm.io/docs/connecting_to_the_database.html
+  #config:
+  #  loc: UTC
+
+# Data dir. All application data will be stored in this dir
+# There may be these files here:
+# - lang: i18n language dir
+# - local: The files of type 'Local Drive' will be placed here
+# - script-drives: Drives implemented using JavaScript
+# - drive-uploaders: The web upload adapters
+# - sessions: The user sessions
+# - temp: Temp dir
+# - thumbnails: Thumbnail cache dir
+# - data.db: SQLite database file
+data-dir: ./
+
+# Temp dir. Default is data-dir/temp
+temp-dir: ""
+
+# Web static files dir.
+web-dir: ./web
+
+# i18n languages
+lang-dir: ./lang
+# If the client's language is not supported, then this language will be used
+default-lang: en-US
+
+# Concurrent task. eg. copy, move, delete
+max-concurrent-task: 100
+
+# Disable 'Local Drive' file path limitation.
+# Set to false if you want 'Local Drive' path is always relative to DATA-DIR/local
+# Set to true if you want 'Local Drive' path is absolute
+# WARNING: The user who has admin permission can view all files in your system if you set this true
+free-fs: false
+
+thumbnail:
+  # Thumbnails cache validity period
+  ttl: 720h
+  # Concurrent task for generating thumbnails, defaults to (number of CPU / 2)
+  #concurrent: 4
+
+  # Thumbnail generator. Available types are image, text, shell
+  # file-types are supported file extensions
+  # tags are comma-separated optional tags for matching thumbnail generator
+  handlers:
+    # image: embed generator for image files(jpg, png, gif)
+    # Notice: this have bad performance
+    - type: image
+      tags:
+      file-types: jpg,jpeg,png,gif
+      #config:
+      #  # max supported file size
+      #  max-size: 33554432 # 32MB
+      #  # max supported image pixels (width * height)
+      #  max-pixels: 36000000 # 6000*6000
+      #  # thumbnail width(px)
+      #  size: 220
+      #  # thumbnail image quality(1-100), higher is better
+      #  quality: 50
+
+    # text: embed generator for text files
+    # Generating a svg file by reading some content
+    - type: text
+      tags:
+      file-types: txt,md,xml,html,css,scss,js,json,jsx,properties,yml,yaml,ini,c,h,cpp,go,java,kt,gradle,ps1
+      #config:
+      #  font-size: 12
+      #  # thumbnail width(px)
+      #  size: 220
+      #  # maximum read bytes
+      #  max-read: 8192
+      #  # thumbnail image padding
+      #  padding: 10
+
+    # shell: generating thumbnail by executing external command, see docs/thumbnail-shell-example.sh
+    # The file content(if the entry is readable and write-content is true) will be written to stdin.
+    # And the thumbnail should be written to stdout.
+    # The generating failed if the command exit with non-zero code.
+    # There are some environment variables will be supplied:
+    #
+    # GO_DRIVE_ENTRY_TYPE: file|dir
+    # GO_DRIVE_ENTRY_REAL_PATH: the entry real path(no chroot, no mount)
+    # GO_DRIVE_ENTRY_PATH: the entry path
+    # GO_DRIVE_ENTRY_NAME: the entry name
+    # GO_DRIVE_ENTRY_SIZE: the entry file size
+    # GO_DRIVE_ENTRY_MOD_TIME: timestamp, modTime of this entry
+    # GO_DRIVE_ENTRY_URL: URL of the file content or folder children (e.g. /content/a/a.txt or /entries/a)
+    #- type: shell
+    #  tag:
+    #  file-types: mp4,avi
+    #  config:
+    #    # the command to generating thumbnail
+    #    shell: ffmpeg -hide_banner -loglevel error -i - -frames:v 1 -vf scale=220:-1 -f mjpeg -
+    #    # the output file mime-type
+    #    mime-type: image/jpeg
+    #    # whether writing file content to stdin
+    #    write-content: true
+    #    # max supported file size, if <= 0, no limitation
+    #    max-size: -1
+    #    # the timeout to generating, if <= 0, no limitation
+    #    timeout: 10m
+
+auth:
+  # User session validity
+  validity: 2h
+  # Auto refresh the token when the user is active
+  auto-refresh: true
+
+# WebDAV access configuration
+#web-dav:
+#  enabled: true
+#  prefix: /dav
+# allow anonymous access?
+#  allow-anonymous: false
+# maximum number of files to be cached at the same time, default is 1000
+#  max-cache-items: 1000
+
+# Search configuration
+search:
+  enabled: false
+  # searcher type: sqlite
+  type: sqlite
+
+# API path. If go-drive is running behind reverse proxy(eg. Nginx) and it's in subpath,
+# then you need to specify the API path
+api-path: ""
+
+# Static files will be served here
+web-path: ""

@@ -1,0 +1,165 @@
+package onedrive
+
+import (
+	"fmt"
+	"go-drive/common/utils"
+	"net/url"
+	path2 "path"
+	"strings"
+	"time"
+)
+
+const uploadChunkSize = 4 * 1024 * 1024
+
+// https://docs.microsoft.com/en-us/graph/api/resources/driveitem?view=graph-rest-1.0#instance-attributes
+const downloadUrlTTL = 40 * time.Minute
+
+// https://docs.microsoft.com/en-us/onedrive/developer/rest-api/api/site_getbypath?view=odsp-graph-online
+type sharePointInfo struct {
+	Id                   string    `json:"id"`
+	DisplayName          string    `json:"displayName"`
+	Name                 string    `json:"name"`
+	CreatedDateTime      time.Time `json:"createdDateTime"`
+	LastModifiedDateTime time.Time `json:"lastModifiedDateTime"`
+	WebURL               string    `json:"webUrl"`
+}
+
+type userProfile struct {
+	DisplayName       string `json:"displayName"`
+	UserPrincipalName string `json:"userPrincipalName"`
+}
+
+type driveInfo struct {
+	Id          string `json:"id"`
+	DriveType   string `json:"driveType"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Quota       struct {
+		Total int64 `json:"total"`
+		Used  int64 `json:"used"`
+	} `json:"quota"`
+}
+
+type userDrives struct {
+	Drives []driveInfo `json:"value"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/audio?view=graph-rest-1.0
+type audioInfo struct {
+	Duration int    `json:"duration"`
+	Album    string `json:"album"`
+	Artist   string `json:"artist"`
+	Title    string `json:"title"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/deleted?view=graph-rest-1.0
+type deleteInfo struct {
+	State string `json:"state"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/file?view=graph-rest-1.0
+type fileInfo struct {
+	MimeType string `json:"mimeType"`
+	Hashes   struct {
+		QuickXorHash string `json:"quickXorHash"`
+		Sha1Hash     string `json:"sha1Hash"`
+	} `json:"hashes"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/folder?view=graph-rest-1.0
+type folderInfo struct {
+	ChildCount int `json:"childCount"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/image?view=graph-rest-1.0
+type imageInfo struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/video?view=graph-rest-1.0
+type videoInfo struct {
+	Duration int `json:"duration"`
+	Width    int `json:"width"`
+	Height   int `json:"height"`
+}
+
+type thumbnailItem struct {
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	URL    string `json:"url"`
+}
+
+type thumbnailInfo struct {
+	Large  *thumbnailItem `json:"large"`
+	Medium *thumbnailItem `json:"medium"`
+	Small  *thumbnailItem `json:"small"`
+}
+
+// https://docs.microsoft.com/en-us/graph/api/resources/driveitem?view=graph-rest-1.0
+type driveItem struct {
+	Id      string      `json:"id"`
+	Name    string      `json:"name"`
+	Size    int64       `json:"size"`
+	Deleted *deleteInfo `json:"deleted"`
+
+	ETag string `json:"eTag"`
+
+	File   *fileInfo   `json:"file"`
+	Folder *folderInfo `json:"folder"`
+
+	Image *imageInfo `json:"image"`
+	Audio *audioInfo `json:"audio"`
+	Video *videoInfo `json:"video"`
+
+	ModTime string `json:"lastModifiedDateTime"`
+
+	DownloadURL string `json:"@microsoft.graph.downloadUrl"`
+
+	Thumbnails []thumbnailInfo `json:"thumbnails"`
+
+	Parent struct {
+		Id   string `json:"id"`
+		Path string `json:"path"`
+	} `json:"parentReference"`
+}
+
+func (d driveItem) Path() string {
+	// Remove the parent prefix before "root:".
+	// The prefix is not fixed, it can be "/drive/root:" or "/drives/{drive-id}/root:".
+	rawPath := d.Parent.Path
+	if i := strings.Index(rawPath, "root:"); i >= 0 {
+		rawPath = rawPath[i+len("root:"):]
+	}
+	parentPath, e := url.PathUnescape(rawPath)
+	if e != nil {
+		parentPath = rawPath
+	}
+	return utils.CleanPath(path2.Join(parentPath, d.Name))
+}
+
+type driveItems struct {
+	Items    []driveItem `json:"value"`
+	NextPage string      `json:"@odata.nextLink"`
+}
+
+type createUploadSessionResp struct {
+	UploadURL string `json:"uploadUrl"`
+}
+
+type actionProgress struct {
+	Percent    float32 `json:"percentageComplete"`
+	ResourceId string  `json:"resourceId"`
+	Status     string  `json:"status"`
+}
+
+type apiError struct {
+	Err struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func (a apiError) Error() string {
+	return fmt.Sprintf("%s: %s", a.Err.Code, a.Err.Message)
+}

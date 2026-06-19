@@ -1,0 +1,305 @@
+error:
+  not_found: Not found
+  not_allowed: Operation not allowed
+  permission_denied: Resource not found or permission denied
+  fail_ban_message: Too many failures, please try again later
+util:
+  request_failed: "[{{ 1 }}] Request failed"
+oauth:
+  state_mismatch: state does not match
+search:
+  invalid_query: Invalid query
+api:
+  admin:
+    unknown_drive_type: Unknown drive type '{{ 1 }}'
+    invalid_drive_name: Invalid drive name '{{ 1 }}'
+    invalid_file_bucket_name: Invalid name '{{ 1 }}'
+  auth:
+    invalid_username_or_password: Invalid username or password
+    group_permission_required: Permission of group '{{ 1 }}' required
+  drive:
+    copy_to_same_path_not_allowed: Copy or move to same path is not allowed
+    copy_to_child_path_not_allowed: Copy or move to child path is not allowed
+    invalid_file_size: Invalid file size
+    invalid_size_or_chunk_size: Invalid size or chunk_size
+  chunk_uploader:
+    invalid_file_size: Invalid file size
+    invalid_chunk_seq: Invalid chunk seq
+    chunk_size_cannot_less_than: Chunk size cannot be less than {{ 1 }}
+    expected__bytes_but__bytes: Expect {{ 1 }} bytes, but {{ 2 }} bytes received
+    missing_chunks: Missing chunks
+    invalid_upload_id: Invalid upload id
+  mem_token:
+    invalid_token: Invalid token
+  file_token:
+    invalid_token: Invalid token
+  permission_wrapper:
+    no_subfolder_permission: You don't have the appropriate permission for the subfolders
+  thumbnail:
+    file_too_large: File size is too large to create thumbnail
+    image_too_large: Image is too large to create thumbnail
+    create_failed: Unable to create thumbnail
+  zip:
+    size_exceed: Exceeds the maximum allowed size {{ 1 }}
+storage:
+  drives:
+    drive_exists: Drive '{{ 1 }}' exists
+  groups:
+    group_not_exists: Group '{{ 1 }}' not exists
+    group_exists: Group '{{ 1 }}' exists
+  users:
+    user_not_exists: User '{{ 1 }}' not exists
+    user_exists: User '{{ 1 }}' exists
+  file_bucket:
+    bucket_exists: Bucket '{{ 1 }}' exists
+drive:
+  not_configured: Drive not configured
+  copy_type_mismatch1: Dest '{{ 2 }}' is a file, but src '{{ 1 }}' is a dir
+  copy_type_mismatch2: Dest '{{ 2 }}' is a dir, but src '{{ 1 }}' is a file
+  file_exists: File exists
+  file_not_exists: File not exist
+  invalid_path: Invalid path
+  file_not_downloadable: This file is not downloadable
+  path_meta:
+    incorrect_password: Password is incorrect
+  root:
+    invalid_drive_type: Invalid drive type '{{ 1 }}'
+    invalid_drive_config: Invalid drive config of '{{ 1 }}'
+    error_create_drive: "Error when creating drive '{{ 1 }}': {{ 2 }}"
+  dispatcher:
+    move_across_not_supported: Move across drives is not supported
+  gdrive:
+    name: Google Drive
+    readme: Google Drive, see [Setup Google Drive](https://go-drive.top/drives/google-drive)
+    form:
+      client_id:
+        label: Client Id
+        description: ""
+      client_secret:
+        label: Client Secret
+        description: ""
+      cache_ttl:
+        label: CacheTTL
+        description: Cache time to live, if omitted, no cache. Valid time units are 'ms', 's', 'm', 'h'.
+      proxy_thumbnail:
+        label: Thumbnail Proxy
+        description: If the thumbnails are not displayed properly, try turning on this option
+    oauth_text: Connect to Google Drive
+    drive_label: Drive
+    my_drive_name: My Drive
+  onedrive:
+    name: OneDrive
+    readme: OneDrive, see [Setup OneDrive](https://go-drive.top/drives/onedrive)
+    form:
+      site:
+        label: Account Type
+        description: ""
+        global: Global
+        china: China
+      tenant:
+        label: Tenant
+        description: ""
+        common: For both Microsoft accounts and work or school accounts
+        organizations: For work or school accounts only
+        consumers: For Microsoft accounts only
+      client_id:
+        label: Client Id
+        description: ""
+      client_secret:
+        label: Client Secret
+        description: ""
+      share_point:
+        label: SharePoint URL
+        description: "Optional if you want store your files in the SharePoint site"
+      proxy_in:
+        label: Proxy Upload
+        description: Upload files through server proxy
+      proxy_out:
+        label: Proxy Download
+        description: Download files through server proxy
+      cache_ttl:
+        label: CacheTTL
+        description: Cache time to live, if omitted, no cache. Valid time units are 'ms', 's', 'm', 'h'.
+    drive_not_selected: Drive not yet selected or failed to get SharePoint site info
+    oauth_text: Connect to OneDrive
+    drive_select: Select drive
+    drive_desc: "{{ 1 }} ({{ 2 }} / {{ 3 }} | {{ 4 }} used)"
+    unexpected_status: Unexpected status code {{ 1 }}
+    unknown_action_status: "Unknown action status: {{ 1 }}"
+  fs:
+    name: File System
+    readme: Local file system drive
+    form:
+      path:
+        label: Root
+        description: The path of root
+    invalid_root_path: Invalid root path
+    root_path_not_exists: Root path not exists
+    cannot_list_file: Cannot list on file
+    cannot_delete_root: Root cannot be deleted
+  s3:
+    name: S3
+    readme: S3 compatible storage
+    form:
+      ak:
+        label: AccessKey
+        description: ""
+      sk:
+        label: SecretKey
+        description: ""
+      bucket:
+        label: Bucket
+        description: ""
+      path_style:
+        label: PathStyle
+        description: Force use path style api
+      region:
+        label: Region
+        description: ""
+      endpoint:
+        label: Endpoint
+        description: The S3 api endpoint
+      proxy_in:
+        label: Proxy Upload
+        description: Upload files through server proxy
+      proxy_out:
+        label: Proxy Download
+        description: Download files through server proxy
+      cache_ttl:
+        label: CacheTTL
+        description: Cache time to live, if omitted, no cache. Valid time units are 'ms', 's', 'm', 'h'.
+    bucket_not_exists: Bucket '{{ 1 }}' not found
+  webdav:
+    name: WebDAV
+    readme: WebDAV protocol drive
+    form:
+      url:
+        label: URL
+        description: The base URL
+      username:
+        label: Username
+        description: The username, if omitted, no authorization is required
+      password:
+        label: Password
+        description: ""
+      cache_ttl:
+        label: CacheTTL
+        description: Cache time to live, if omitted, no cache. Valid time units are 'ms', 's', 'm', 'h'.
+    wrong_user_or_password: Maybe the username or password is not correct
+    remote_error: "Remote service error: {{ 1 }}"
+  ftp:
+    name: FTP
+    readme: FTP drive
+    form:
+      host:
+        label: Host
+        description: ""
+      port:
+        label: Port
+        description: ""
+      user:
+        label: User
+        description: User name. Defaults to 'anonymous'
+      password:
+        label: Password
+        description: User password. Defaults to 'anonymous' if required
+      concurrent:
+        label: Concurrent
+        description: Maximum number of concurrent FTP connections, Defaults to 5
+      timeout:
+        label: Timeout
+        description: Defaults to 5s. Valid time units are 'ms', 's', 'm', 'h'
+      cache_ttl:
+        label: CacheTTL
+        description: Cache time to live, if omitted, no cache. Valid time units are 'ms', 's', 'm', 'h'.
+  sftp:
+    name: SFTP
+    readme: SFTP drive <br/> @[Vgbhfive](https://blog.vgbhfive.cn)
+    form:
+      host:
+        label: Host
+        description: ""
+      port:
+        label: Port
+        description: "Default is 22"
+      user:
+        label: User
+        description: User name
+      password:
+        label: Password
+        description: Password for login authentication, password and private key must be either
+      priv_key:
+        label: Private Key
+        description: |
+          The private key used for login authentication, such as -----BEGIN RSA PRIVATE KEY-----, encrypted private key is not supported for now, the private key and password must be either one of them
+      host_key:
+        label: HostKey
+        description: The host key for verifying the server's identity(optional)
+      root_path:
+        label: Path
+        description: "The root path of the remote server. Defaults to '/'."
+      cache_ttl:
+        label: CacheTTL
+        description: Cache time to live, if omitted, no cache. Valid time units are 'ms', 's', 'm', 'h'.
+    invalid_root_path: "Root path must starts with '/'"
+  script:
+    name: Script
+    readme: Use the JavaScript driver. Please save it and configure it below
+    invalid_pool_config: "Invalid Pool configuration: {{ 1 }}"
+    form:
+      pool:
+        label: Pool
+        description: JavaScript runtime pool configuration in the format of 'MaxTotal,MaxIdle,MinIdle,IdleTime' with default values of '100,50,10,30m'. See https://pkg.go.dev/github.com/jolestar/go-commons-pool#ObjectPoolConfig for details
+      script:
+        label: Script File
+        description: Select the script in the scripts folder
+stat:
+  task:
+    total: Total
+    pending: Pending
+    running: Running
+    done: Done
+    error: Error
+    canceled: Canceled
+jobs:
+  copy:
+    name: Copy
+    desc: Copying files
+    src: Source Path
+    src_desc: Source paths (one per line), wildcard support
+    dest: Destination Path
+    dest_desc: Must exist and be a folder
+    override: Override
+    override_desc: Whether to overwrite the file with the same name when copying, otherwise it will be renamed automatically
+    move: Move
+    move_desc: Move files, not copy
+  delete:
+    name: Delete
+    desc: Delete files
+    paths: Path
+    paths_desc: Paths to be deleted (one per line), wildcard support
+  flow:
+    name: Flow
+    desc: Execute multiple operations in sequence
+    add_text: Add operation
+    ignore_err: Ignore errors
+    ignore_err_desc: When this operation fails, ignore the error and continue down the line
+  script:
+    name: Script
+    desc: Execute JavaScript
+    code: Code
+    code_desc: JavaScript Code
+  trigger:
+    cron:
+      name: Cron
+      desc: Run on a cron schedule
+      schedule: Schedule
+      schedule_desc: "Cron expression (see https://crontab.cronhub.io/)"
+    entry:
+      name: Entry
+      desc: Run when a file or folder is created, updated or deleted
+      path_pattern: Path Pattern
+      path_pattern_desc: "Glob pattern to match paths, path does not start with /\n** matches zero or more directories;\n* matches any number of non-directory separator characters;\n? matches a single non-directory separator character."
+      event_types: Event Types
+      event_entry_updated: Updated
+      event_entry_deleted: Deleted
