@@ -15,6 +15,7 @@ import (
 	"go-drive/drive"
 	"go-drive/server"
 	"go-drive/server/job"
+	mp "go-drive/server/mount_permission"
 	"go-drive/server/search"
 	"go-drive/server/thumbnail"
 	"go-drive/storage"
@@ -39,6 +40,12 @@ func Initialize(ctx context.Context, ch *registry.ComponentsHolder) (*gin.Engine
 		storage.NewJobDAO,
 		storage.NewPathMetaDAO,
 		storage.NewFileBucketDAO,
+		storage.NewIndexJobStateDAO,
+		storage.NewDriveSessionDAO,
+		storage.NewPathMountRuleDAO,
+		storage.NewFullTextIndexDAO,
+		storage.NewJobHistoryDAO,
+		storage.NewJobRetryConfigDAO,
 		wire.Bind(new(task.Runner), new(*task.TunnyRunner)),
 		task.NewTunnyRunner,
 		utils.NewSigner,
@@ -49,9 +56,12 @@ func Initialize(ctx context.Context, ch *registry.ComponentsHolder) (*gin.Engine
 		drive.NewRootDrive,
 		drive.NewAccess,
 		search.NewService,
+		search.NewFullTextService,
+		mp.NewMountPermissionService,
 		wire.Bind(new(i18n.MessageSource), new(*i18n.FileMessageSource)),
 		i18n.NewFileMessageSource,
 		job.NewJobExecutor,
+		job.NewJobHistoryService,
 		server.InitServer,
 	)
 	return &gin.Engine{}, nil

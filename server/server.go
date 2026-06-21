@@ -12,6 +12,7 @@ import (
 	"go-drive/common/utils"
 	"go-drive/drive"
 	"go-drive/server/job"
+	mp "go-drive/server/mount_permission"
 	"go-drive/server/search"
 	"go-drive/server/thumbnail"
 	"go-drive/storage"
@@ -29,6 +30,9 @@ func InitServer(config common.Config,
 	rootDrive *drive.RootDrive,
 	driveAccess *drive.Access,
 	searcher *search.Service,
+	fullTextService *search.FullTextService,
+	mountPermService *mp.MountPermissionService,
+	jobHistoryService *job.JobHistoryService,
 	tokenStore types.TokenStore,
 	thumbnail *thumbnail.Maker,
 	signer *utils.Signer,
@@ -41,8 +45,14 @@ func InitServer(config common.Config,
 	driveDataDAO *storage.DriveDataDAO,
 	permissionDAO *storage.PathPermissionDAO,
 	pathMountDAO *storage.PathMountDAO,
+	pathMountRuleDAO *storage.PathMountRuleDAO,
 	pathMetaDAO *storage.PathMetaDAO,
 	jobDAO *storage.JobDAO,
+	jobHistoryDAO *storage.JobHistoryDAO,
+	jobRetryConfigDAO *storage.JobRetryConfigDAO,
+	ftIndexDAO *storage.FullTextIndexDAO,
+	indexJobStateDAO *storage.IndexJobStateDAO,
+	driveSessionDAO *storage.DriveSessionDAO,
 	fileBucketDAO *storage.FileBucketDAO,
 	jobExecutor *job.JobExecutor,
 	messageSource i18n.MessageSource) (*gin.Engine, error) {
@@ -84,13 +94,13 @@ func InitServer(config common.Config,
 	if e := InitAuthRoutes(router, userAuth, tokenStore, failBanGroup); e != nil {
 		return nil, e
 	}
-	if e := InitAdminRoutes(router, ch, config, bus, runner, jobExecutor, driveAccess, rootDrive, searcher, tokenStore, optionsDAO,
-		userDAO, groupDAO, driveDAO, driveDataDAO, permissionDAO, pathMountDAO, pathMetaDAO, jobDAO, fileBucketDAO); e != nil {
+	if e := InitAdminRoutes(router, ch, config, bus, runner, jobExecutor, jobHistoryService, driveAccess, rootDrive, searcher, fullTextService, mountPermService, tokenStore, optionsDAO,
+		userDAO, groupDAO, driveDAO, driveDataDAO, permissionDAO, pathMountDAO, pathMountRuleDAO, pathMetaDAO, jobDAO, jobHistoryDAO, jobRetryConfigDAO, ftIndexDAO, indexJobStateDAO, driveSessionDAO, fileBucketDAO); e != nil {
 		return nil, e
 	}
 
-	if e := InitDriveRoutes(router, driveAccess, searcher, config, thumbnail,
-		signer, chunkUploader, runner, tokenStore, userDAO, optionsDAO, pathMetaDAO); e != nil {
+	if e := InitDriveRoutes(router, driveAccess, searcher, fullTextService, config, thumbnail,
+		signer, chunkUploader, runner, tokenStore, userDAO, optionsDAO, pathMetaDAO, driveSessionDAO); e != nil {
 		return nil, e
 	}
 

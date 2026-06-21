@@ -1,6 +1,11 @@
 package types
 
-import "strings"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
+	"time"
+)
 
 type Option struct {
 	Key   string `gorm:"column:key;primaryKey;type:string;size:64"`
@@ -191,4 +196,190 @@ func (p PathPermission) IsAccept() bool {
 
 func (p PathPermission) IsReject() bool {
 	return p.Policy == PolicyReject
+}
+
+// ==================== Full-text Index Models ====================
+
+const (
+	IndexStatusPending   = "pending"
+	IndexStatusRunning   = "running"
+	IndexStatusPaused    = "paused"
+	IndexStatusCompleted = "completed"
+	IndexStatusFailed    = "failed"
+)
+
+type FullTextIndex struct {
+	ID            uint      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Drive         string    `gorm:"column:drive;not null;type:string;size:255;index" json:"drive"`
+	PathHash      string    `gorm:"column:path_hash;not null;type:string;size:64;uniqueIndex" json:"pathHash"`
+	Path          string    `gorm:"column:path;not null;type:string;size:4096" json:"path"`
+	Name          string    `gorm:"column:name;not null;type:string;size:255;index" json:"name"`
+	Ext           string    `gorm:"column:ext;type:string;size:64" json:"ext"`
+	MimeType      string    `gorm:"column:mime_type;type:string;size:128;index" json:"mimeType"`
+	Size          int64     `gorm:"column:size;not null;type:bigint" json:"size"`
+	ModTime       int64     `gorm:"column:mod_time;not null;type:bigint;index" json:"modTime"`
+	Content       string    `gorm:"column:content;type:text" json:"-"`
+	ContentHash   string    `gorm:"column:content_hash;not null;type:string;size:64;index" json:"contentHash"`
+	LastIndexedAt int64     `gorm:"column:last_indexed_at;not null;type:bigint;index" json:"lastIndexedAt"`
+	Indexed       bool      `gorm:"column:indexed;not null;type:bool;default:false;index" json:"indexed"`
+	ErrorMsg      string    `gorm:"column:error_msg;type:text" json:"errorMsg,omitempty"`
+}
+
+func (FullTextIndex) TableName() string {
+	return "full_text_index"
+}
+
+func HashPath(drive, path string) string {
+	h := sha256.Sum256([]byte(drive + ":" + path))
+	return hex.EncodeToString(h[:])
+}
+
+func HashContent(content string) string {
+	h := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(h[:])
+}
+
+type IndexJobState struct {
+	ID             uint   `gorm:"column:id;primaryKey;autoIncrement"`
+	Drive          string `gorm:"column:drive;not null;type:string;size:255;uniqueIndex"`
+	Status         string `gorm:"column:status;not null;type:string;size:32;index"`
+	CurrentPath    string `gorm:"column:current_path;type:string;size:4096"`
+	TotalFiles     int64  `gorm:"column:total_files;not null;type:bigint;default:0"`
+	ScannedFiles   int64  `gorm:"column:scanned_files;not null;type:bigint;default:0"`
+	IndexedFiles   int64  `gorm:"column:indexed_files;not null;type:bigint;default:0"`
+	FailedFiles    int64  `gorm:"column:failed_files;not null;type:bigint;default:0"`
+	StartedAt      int64  `gorm:"column:started_at;type:bigint"`
+	LastUpdatedAt  int64  `gorm:"column:last_updated_at;type:bigint"`
+	ErrorMsg       string `gorm:"column:error_msg;type:text"`
+}
+
+func (IndexJobState) TableName() string {
+	return "index_job_state"
+}
+
+// ==================== Mount Point Permission Models ====================
+
+type PathMountRule struct {
+	ID         uint       `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Drive      string     `gorm:"column:drive;not null;type:string;size:255;index" json:"drive"`
+	Path       string     `gorm:"column:path;not null;type:string;size:512;index" json:"path"`
+	Subject    string     `gorm:"column:subject;not null;type:string;size:34" json:"subject"`
+	Permission Permission `gorm:"column:permission;not null" json:"permission"`
+	Policy     uint8      `gorm:"column:policy;not null" json:"policy"`
+	Inherits   bool       `gorm:"column:inherits;not null;type:bool;default:true" json:"inherits"`
+	CreatedAt  int64      `gorm:"column:created_at;not null;type:bigint" json:"createdAt"`
+	UpdatedAt  int64      `gorm:"column:updated_at;not null;type:bigint" json:"updatedAt"`
+}
+
+func (PathMountRule) TableName() string {
+	return "path_mount_rule"
+}
+
+type MountPermissionNode struct {
+	Path        string                `json:"path"`
+	Drive       string                `json:"drive"`
+	IsMountRoot bool                  `json:"isMountRoot"`
+	Permissions []PathMountRule       `json:"permissions"`
+	Children    []*MountPermissionNode `json:"children,omitempty"`
+}
+
+// ==================== Job History & Retry Models ====================
+
+const (
+	JobHistoryStatusRunning   = "running"
+	JobHistoryStatusSuccess   = "success"
+	JobHistoryStatusFailed    = "failed"
+	JobHistoryStatusDeadLetter = "dead_letter"
+	JobHistoryStatusRetrying  = "retrying"
+)
+
+const (
+	TriggerSourceCron    = "cron"
+	TriggerSourceManual  = "manual"
+	TriggerSourceEvent   = "event"
+	TriggerSourceRetry   = "retry"
+	TriggerSourceAPI     = "api"
+)
+
+type JobRetryConfig struct {
+	ID                   uint   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	JobId                uint   `gorm:"column:job_id;not null;type:uint;uniqueIndex" json:"jobId"`
+	RetryEnabled         bool   `gorm:"column:retry_enabled;not null;type:bool;default:false" json:"retryEnabled"`
+	RetryIntervalMinutes int    `gorm:"column:retry_interval_minutes;not null;type:int;default:5" json:"retryIntervalMinutes"`
+	MaxRetries           int    `gorm:"column:max_retries;not null;type:int;default:3" json:"maxRetries"`
+	RetryCount           int    `gorm:"column:retry_count;not null;type:int;default:0" json:"retryCount"`
+	NextRetryAt          int64  `gorm:"column:next_retry_at;type:bigint" json:"nextRetryAt,omitempty"`
+}
+
+func (JobRetryConfig) TableName() string {
+	return "job_retry_config"
+}
+
+type JobHistory struct {
+	ID             uint   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	JobId          uint   `gorm:"column:job_id;not null;type:uint;index" json:"jobId"`
+	JobDescription string `gorm:"column:job_description;type:text" json:"jobDescription"`
+	ExecutionId    uint   `gorm:"column:execution_id;type:uint" json:"executionId,omitempty"`
+	TriggerSource  string `gorm:"column:trigger_source;not null;type:string;size:32;index" json:"triggerSource"`
+	TriggerData    string `gorm:"column:trigger_data;type:text" json:"triggerData,omitempty"`
+	Status         string `gorm:"column:status;not null;type:string;size:32;index" json:"status"`
+	StartedAt      int64  `gorm:"column:started_at;not null;type:bigint;index" json:"startedAt"`
+	CompletedAt    int64  `gorm:"column:completed_at;type:bigint" json:"completedAt,omitempty"`
+	DurationMs     int64  `gorm:"column:duration_ms;type:bigint" json:"durationMs,omitempty"`
+	ErrorSummary   string `gorm:"column:error_summary;type:string;size:512" json:"errorSummary,omitempty"`
+	ErrorDetail    string `gorm:"column:error_detail;type:text" json:"errorDetail,omitempty"`
+	IsArchived     bool   `gorm:"column:is_archived;not null;type:bool;default:false;index" json:"isArchived"`
+	RetryOf        uint   `gorm:"column:retry_of;type:uint;index" json:"retryOf,omitempty"`
+	RetryCount     int    `gorm:"column:retry_count;not null;type:int;default:0" json:"retryCount"`
+}
+
+func (JobHistory) TableName() string {
+	return "job_history"
+}
+
+type JobEventLog struct {
+	ID          uint   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	HistoryId   uint   `gorm:"column:history_id;not null;type:uint;index" json:"historyId"`
+	Timestamp   int64  `gorm:"column:timestamp;not null;type:bigint;index" json:"timestamp"`
+	Level       string `gorm:"column:level;not null;type:string;size:16;default:info" json:"level"`
+	Message     string `gorm:"column:message;not null;type:text" json:"message"`
+	MessageFull string `gorm:"column:message_full;type:text" json:"messageFull,omitempty"`
+	IsExpanded  bool   `gorm:"-" json:"isExpanded,omitempty"`
+}
+
+func (JobEventLog) TableName() string {
+	return "job_event_log"
+}
+
+func (l *JobEventLog) TruncateMessage() {
+	if len(l.Message) > 200 {
+		l.MessageFull = l.Message
+		l.Message = l.Message[:200] + "..."
+	}
+}
+
+func (l *JobEventLog) ExpandMessage() {
+	if l.MessageFull != "" {
+		l.Message = l.MessageFull
+		l.IsExpanded = true
+	}
+}
+
+// ==================== Drive Context & Token Models ====================
+
+type DriveSession struct {
+	Drive     string    `gorm:"column:drive;primaryKey;not null;type:string;size:255"`
+	Token     string    `gorm:"column:token;not null;type:string;size:64;index"`
+	Username  string    `gorm:"column:username;not null;type:string;size:32;index"`
+	CreatedAt int64     `gorm:"column:created_at;not null;type:bigint"`
+	ExpiresAt int64     `gorm:"column:expires_at;not null;type:bigint;index"`
+}
+
+func (DriveSession) TableName() string {
+	return "drive_session"
+}
+
+// Now returns current Unix timestamp in milliseconds
+func NowMillis() int64 {
+	return time.Now().UnixMilli()
 }

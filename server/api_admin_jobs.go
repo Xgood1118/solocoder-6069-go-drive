@@ -149,7 +149,8 @@ func (jr *jobsRoute) executeJob(c *gin.Context) {
 	w := c.Writer
 	e = ExecuteTaskStreaming(c, jr.runner,
 		func(ctx types.TaskCtx) (any, error) {
-			e := jr.jobExecutor.ExecuteJobSync(ctx, jobObj, job.TriggerEvent{}, func(s string) {
+			event := job.TriggerEvent{}
+			e := jr.jobExecutor.ExecuteJobWithSource(ctx, jobObj, event, types.TriggerSourceAPI, func(s string) {
 				_, _ = w.Write([]byte(s + "\n"))
 				w.Flush()
 			})

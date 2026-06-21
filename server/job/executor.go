@@ -17,9 +17,11 @@ import (
 )
 
 type JobExecutor struct {
-	ch     *registry.ComponentsHolder
-	runner task.Runner
-	jobDAO *storage.JobDAO
+	ch                *registry.ComponentsHolder
+	runner            task.Runner
+	jobDAO            *storage.JobDAO
+	jobHistoryDAO     *storage.JobHistoryDAO
+	jobRetryConfigDAO *storage.JobRetryConfigDAO
 
 	triggers   map[JobTriggerType]IJobTriggerInstance
 	executions map[uint]*jobExecutionItem
@@ -27,15 +29,17 @@ type JobExecutor struct {
 	mu sync.Mutex
 }
 
-func NewJobExecutor(jobDAO *storage.JobDAO, ch *registry.ComponentsHolder) (*JobExecutor, error) {
+func NewJobExecutor(jobDAO *storage.JobDAO, jobHistoryDAO *storage.JobHistoryDAO, jobRetryConfigDAO *storage.JobRetryConfigDAO, ch *registry.ComponentsHolder) (*JobExecutor, error) {
 	runner := ch.Get(registry.KeyTaskRunner).(task.Runner)
 
 	executor := &JobExecutor{
-		ch:         ch,
-		runner:     runner,
-		jobDAO:     jobDAO,
-		executions: make(map[uint]*jobExecutionItem),
-		triggers:   make(map[JobTriggerType]IJobTriggerInstance),
+		ch:                ch,
+		runner:            runner,
+		jobDAO:            jobDAO,
+		jobHistoryDAO:     jobHistoryDAO,
+		jobRetryConfigDAO: jobRetryConfigDAO,
+		executions:        make(map[uint]*jobExecutionItem),
+		triggers:          make(map[JobTriggerType]IJobTriggerInstance),
 	}
 
 	for _, triggerDef := range GetTriggerDefs() {
@@ -113,18 +117,39 @@ func (je *JobExecutor) TriggerExecution(jobID uint, event TriggerEvent) (task.Ta
 }
 
 func (je *JobExecutor) ExecuteJobSync(ctx context.Context, job types.Job, event TriggerEvent, onLog func(string)) error {
-	jobExecution, e := je.newJobExecution(job)
+	triggerSource := je.getTriggerSource(&event)
+	return je.executeJobWithHistory(ctx, job, event, triggerSource, onLog, 0, 0)
+}
+
+func (je *JobExecutor) ExecuteJobWithSource(ctx context.Context, job types.Job, event TriggerEvent, triggerSource string, onLog func(string)) error {
+	return je.executeJobWithHistory(ctx, job, event, triggerSource, onLog, 0, 0)
+}
+
+func (je *JobExecutor) executeJobWithHistory(ctx context.Context, job types.Job, event TriggerEvent,
+	triggerSource string, onLog func(string), retryOf uint, retryCount int) error {
+
+	history, e := je.newJobHistory(job, triggerSource, &event, retryOf, retryCount)
 	if e != nil {
+		log.Printf("[JobExecutor] failed to create job history: %v", e)
 		return e
 	}
+
+	jobExecution, e := je.newJobExecution(job, history)
+	if e != nil {
+		je.updateHistoryStatus(history, types.JobHistoryStatusFailed, 0, e.Error(), e.Error())
+		return e
+	}
+
 	logger := newJobExecutionLogger(jobExecution.ID, onLog)
-	return je.executeJob(ctx, job, jobExecution, logger, &event)
+	je.addEventLog(history.ID, "info", fmt.Sprintf("Job started: %s", job.Description))
+
+	return je.executeJob(ctx, job, jobExecution, history, logger, &event)
 }
 
 func (je *JobExecutor) executeJob(ctx context.Context, job types.Job,
-	jobExecution *types.JobExecution, logger *jobExecutionLogger, event *TriggerEvent) (e error) {
+	jobExecution *types.JobExecution, history *types.JobHistory, logger *jobExecutionLogger, event *TriggerEvent) (e error) {
 	executionCtx, cancel := context.WithCancel(ctx)
-	item := &jobExecutionItem{JobExecution: jobExecution, cancel: cancel, logger: logger}
+	item := &jobExecutionItem{JobExecution: jobExecution, jobHistory: history, cancel: cancel, logger: logger}
 	je.addJobExecution(item)
 
 	defer func() {
@@ -133,7 +158,8 @@ func (je *JobExecutor) executeJob(ctx context.Context, job types.Job,
 
 	actionDef := GetActionDef(job.Action)
 	if actionDef == nil {
-		e = errors.New("job not found")
+		e = errors.New("job action not found: " + job.Action)
+		je.addEventLog(history.ID, "error", e.Error())
 		return
 	}
 
@@ -141,6 +167,7 @@ func (je *JobExecutor) executeJob(ctx context.Context, job types.Job,
 	e = json.Unmarshal([]byte(job.ActionParams), &params)
 	if e != nil {
 		e = fmt.Errorf("failed to parse params: %s", e.Error())
+		je.addEventLog(history.ID, "error", e.Error())
 		return
 	}
 
@@ -152,32 +179,190 @@ func (je *JobExecutor) executeJob(ctx context.Context, job types.Job,
 		}
 	}
 
+	je.addEventLog(history.ID, "info", fmt.Sprintf("Executing action: %s", job.Action))
+
 	e = actionDef.Do(executionCtx, params, je.ch, item.logger.Log)
+	if e != nil {
+		je.addEventLog(history.ID, "error", fmt.Sprintf("Job failed: %v", e))
+	} else {
+		je.addEventLog(history.ID, "info", "Job completed successfully")
+	}
 	return
 }
 
-func (je *JobExecutor) newJobExecution(job types.Job) (*types.JobExecution, error) {
+func (je *JobExecutor) getTriggerSource(event *TriggerEvent) string {
+	if event == nil {
+		return types.TriggerSourceManual
+	}
+	switch event.Type {
+	case JobTriggerTypeCron:
+		return types.TriggerSourceCron
+	case JobTriggerTypeEntry:
+		return types.TriggerSourceEvent
+	default:
+		return types.TriggerSourceManual
+	}
+}
+
+func (je *JobExecutor) newJobHistory(job types.Job, triggerSource string, event *TriggerEvent, retryOf uint, retryCount int) (*types.JobHistory, error) {
+	now := types.NowMillis()
+	triggerData := ""
+	if event != nil && event.Data != nil {
+		eventBytes, e := json.Marshal(event.Data)
+		if e == nil {
+			triggerData = string(eventBytes)
+		}
+	}
+
+	history := &types.JobHistory{
+		JobId:          job.ID,
+		JobDescription: job.Description,
+		TriggerSource:  triggerSource,
+		TriggerData:    triggerData,
+		Status:         types.JobHistoryStatusRunning,
+		StartedAt:      now,
+		RetryOf:        retryOf,
+		RetryCount:     retryCount,
+	}
+	e := je.jobHistoryDAO.CreateHistory(history)
+	return history, e
+}
+
+func (je *JobExecutor) addEventLog(historyId uint, level string, message string) {
+	eventLog := &types.JobEventLog{
+		HistoryId: historyId,
+		Timestamp: types.NowMillis(),
+		Level:     level,
+		Message:   message,
+	}
+	if e := je.jobHistoryDAO.AddEventLog(eventLog); e != nil {
+		log.Printf("[JobExecutor] failed to add event log: %v", e)
+	}
+}
+
+func (je *JobExecutor) newJobExecution(job types.Job, history *types.JobHistory) (*types.JobExecution, error) {
 	jobExecution := &types.JobExecution{
 		JobId:     job.ID,
 		StartedAt: uint64(time.Now().UnixMilli()),
 		Status:    types.JobExecutionRunning,
 	}
 	e := je.jobDAO.AddJobExecution(jobExecution)
+	if e != nil {
+		return nil, e
+	}
+
+	if history != nil {
+		history.ExecutionId = jobExecution.ID
+	}
+
 	return jobExecution, e
+}
+
+func (je *JobExecutor) updateHistoryStatus(history *types.JobHistory, status string, durationMs int64, errorSummary string, errorDetail string) {
+	now := types.NowMillis()
+	completedAt := int64(0)
+	if status != types.JobHistoryStatusRunning {
+		completedAt = now
+	}
+	if e := je.jobHistoryDAO.UpdateHistoryStatus(history.ID, status, completedAt, durationMs, errorSummary, errorDetail); e != nil {
+		log.Printf("[JobExecutor] failed to update job history status: %v", e)
+	}
+}
+
+func (je *JobExecutor) scheduleRetry(job types.Job, history *types.JobHistory, event TriggerEvent, lastError error) bool {
+	retryConfig, e := je.jobRetryConfigDAO.GetByJobId(job.ID)
+	if e != nil {
+		return false
+	}
+
+	if !retryConfig.RetryEnabled {
+		return false
+	}
+
+	if retryConfig.RetryCount >= retryConfig.MaxRetries {
+		je.addEventLog(history.ID, "warn", fmt.Sprintf("Retry count exhausted (%d/%d), marking as dead letter", retryConfig.RetryCount, retryConfig.MaxRetries))
+		if e := je.jobHistoryDAO.MarkAsDeadLetter(history.ID, lastError.Error()); e != nil {
+			log.Printf("[JobExecutor] failed to mark as dead letter: %v", e)
+		}
+		return false
+	}
+
+	nextRetryAt := types.NowMillis() + int64(retryConfig.RetryIntervalMinutes)*60*1000
+	nextRetryCount := retryConfig.RetryCount + 1
+
+	if e := je.jobRetryConfigDAO.UpdateRetryCount(job.ID, nextRetryCount); e != nil {
+		log.Printf("[JobExecutor] failed to update retry count: %v", e)
+		return false
+	}
+	if e := je.jobRetryConfigDAO.UpdateNextRetryAt(job.ID, nextRetryAt); e != nil {
+		log.Printf("[JobExecutor] failed to update next retry at: %v", e)
+		return false
+	}
+
+	je.addEventLog(history.ID, "info", fmt.Sprintf("Scheduled retry %d/%d at %v", nextRetryCount, retryConfig.MaxRetries, time.UnixMilli(nextRetryAt)))
+
+	go func() {
+		waitDuration := time.Until(time.UnixMilli(nextRetryAt))
+		if waitDuration > 0 {
+			time.Sleep(waitDuration)
+		}
+
+		_, e := je.runner.Execute(func(ctx types.TaskCtx) (any, error) {
+			return nil, je.executeJobWithHistory(ctx, job, event, types.TriggerSourceRetry, nil, history.ID, nextRetryCount)
+		}, task.WithNameGroup(job.Description, "job/retry"))
+
+		if e != nil {
+			log.Printf("[JobExecutor] failed to execute retry: %v", e)
+		}
+	}()
+
+	return true
 }
 
 func (je *JobExecutor) updateJobExecutionResult(item *jobExecutionItem, e error) {
 	item.CompletedAt = uint64(time.Now().UnixMilli())
+	durationMs := int64(item.CompletedAt) - int64(item.StartedAt)
+
 	if e != nil {
 		item.Status = types.JobExecutionFailed
 		item.ErrorMsg = e.Error()
 	} else {
 		item.Status = types.JobExecutionSuccess
 	}
+
 	item.JobExecution.Logs = item.logger.String()
-	if e := je.jobDAO.UpdateJobExecution(item.JobExecution); e != nil {
-		log.Printf("failed to update job execution: %v", e)
+	if updateErr := je.jobDAO.UpdateJobExecution(item.JobExecution); updateErr != nil {
+		log.Printf("[JobExecutor] failed to update job execution: %v", updateErr)
 	}
+
+	if item.jobHistory != nil {
+		errorSummary := ""
+		errorDetail := ""
+		historyStatus := types.JobHistoryStatusSuccess
+
+		if e != nil {
+			errorSummary = e.Error()
+			if len(errorSummary) > 512 {
+				errorSummary = errorSummary[:512]
+			}
+			errorDetail = e.Error()
+			historyStatus = types.JobHistoryStatusFailed
+		}
+
+		je.updateHistoryStatus(item.jobHistory, historyStatus, durationMs, errorSummary, errorDetail)
+
+		if e != nil {
+			job, getJobErr := je.jobDAO.GetJob(item.JobId)
+			if getJobErr == nil {
+				event := TriggerEvent{}
+				if item.jobHistory.TriggerData != "" {
+					_ = json.Unmarshal([]byte(item.jobHistory.TriggerData), &event.Data)
+				}
+				je.scheduleRetry(job, item.jobHistory, event, e)
+			}
+		}
+	}
+
 	item.cancel()
 	je.removeJobExecution(item.ID)
 }
@@ -268,10 +453,22 @@ func (je *JobExecutor) Dispose() error {
 	return nil
 }
 
+func (je *JobExecutor) TriggerExecutionWithSource(jobID uint, event TriggerEvent, triggerSource string) (task.Task, error) {
+	job, e := je.jobDAO.GetJob(jobID)
+	if e != nil {
+		return task.Task{}, e
+	}
+
+	return je.runner.Execute(func(ctx types.TaskCtx) (any, error) {
+		return nil, je.executeJobWithHistory(ctx, job, event, triggerSource, nil, 0, 0)
+	}, task.WithNameGroup(job.Description, "job/execution"))
+}
+
 type jobExecutionItem struct {
 	*types.JobExecution
-	cancel func()
-	logger *jobExecutionLogger
+	jobHistory *types.JobHistory
+	cancel     func()
+	logger     *jobExecutionLogger
 }
 
 func newJobExecutionLogger(jid uint, onLog func(string)) *jobExecutionLogger {

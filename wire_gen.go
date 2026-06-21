@@ -72,7 +72,17 @@ func Initialize(ctx context.Context, ch *registry.ComponentsHolder) (*gin.Engine
 	groupDAO := storage.NewGroupDAO(db, ch)
 	jobDAO := storage.NewJobDAO(db, ch)
 	fileBucketDAO := storage.NewFileBucketDAO(db, ch)
-	jobExecutor, err := job.NewJobExecutor(jobDAO, ch)
+	indexJobStateDAO := storage.NewIndexJobStateDAO(db, ch)
+	driveSessionDAO := storage.NewDriveSessionDAO(db, ch)
+	fullTextIndexDAO := storage.NewFullTextIndexDAO(db, ch)
+	pathMountRuleDAO := storage.NewPathMountRuleDAO(db, ch)
+	jobHistoryDAO := storage.NewJobHistoryDAO(db, ch)
+	jobRetryConfigDAO := storage.NewJobRetryConfigDAO(db, ch)
+	jobExecutor, err := job.NewJobExecutor(jobDAO, jobHistoryDAO, jobRetryConfigDAO, ch)
+	if err != nil {
+		return nil, err
+	}
+	_, err = job.NewJobHistoryService(ch, config, tunnyRunner, jobHistoryDAO, jobRetryConfigDAO, jobExecutor)
 	if err != nil {
 		return nil, err
 	}

@@ -58,6 +58,17 @@ func NewDB(config common.Config, ch *registry.ComponentsHolder) (*DB, error) {
 		&types.JobExecution{},
 		&types.PathMeta{},
 		&types.FileBucket{},
+		// New tables for full-text index
+		&types.FullTextIndex{},
+		&types.IndexJobState{},
+		// New tables for mount point permissions
+		&types.PathMountRule{},
+		// New tables for job history & retry
+		&types.JobRetryConfig{},
+		&types.JobHistory{},
+		&types.JobEventLog{},
+		// New table for drive sessions
+		&types.DriveSession{},
 	); e != nil {
 		closeDb(db)
 		return nil, e

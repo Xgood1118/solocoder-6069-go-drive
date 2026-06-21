@@ -33,4 +33,17 @@ var (
 	KeyPathPermissionDAO = componentKey{k: "pathPermissionDAO"}
 	KeyPathMountDAO      = componentKey{k: "pathMountDAO"}
 	KeyGroupDAO          = componentKey{k: "groupDAO"}
+
+	// New DAOs for extended features
+	KeyFullTextIndexDAO  = componentKey{k: "fullTextIndexDAO"}
+	KeyIndexJobStateDAO  = componentKey{k: "indexJobStateDAO"}
+	KeyPathMountRuleDAO  = componentKey{k: "pathMountRuleDAO"}
+	KeyJobHistoryDAO     = componentKey{k: "jobHistoryDAO"}
+	KeyJobRetryConfigDAO = componentKey{k: "jobRetryConfigDAO"}
+	KeyDriveSessionDAO   = componentKey{k: "driveSessionDAO"}
+
+	// New services
+	KeyFullTextIndexService = componentKey{k: "fullTextIndexService"}
+	KeyMountPermissionService = componentKey{k: "mountPermissionService"}
+	KeyJobHistoryService = componentKey{k: "jobHistoryService"}
 )

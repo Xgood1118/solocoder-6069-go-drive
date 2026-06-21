@@ -34,6 +34,7 @@ func InitDriveRoutes(
 	router gin.IRouter,
 	access *drive.Access,
 	searcher *search.Service,
+	fullTextService *search.FullTextService,
 	config common.Config,
 	thumbnail *thumbnail.Maker,
 	signer *utils.Signer,
@@ -42,9 +43,23 @@ func InitDriveRoutes(
 	tokenStore types.TokenStore,
 	userDAO *storage.UserDAO,
 	optionsDAO *storage.OptionsDAO,
-	pathMetaDAO *storage.PathMetaDAO) error {
+	pathMetaDAO *storage.PathMetaDAO,
+	driveSessionDAO *storage.DriveSessionDAO) error {
 
-	dr := driveRoute{config, access, searcher, tokenStore, chunkUploader, thumbnail, runner, signer, optionsDAO, pathMetaDAO}
+	dr := driveRoute{
+		config:           config,
+		access:           access,
+		searcher:         searcher,
+		fullTextService:  fullTextService,
+		tokenStore:       tokenStore,
+		chunkUploader:    chunkUploader,
+		thumbnail:        thumbnail,
+		runner:           runner,
+		signer:           signer,
+		options:          optionsDAO,
+		pathMeta:         pathMetaDAO,
+		driveSessionDAO:  driveSessionDAO,
+	}
 
 	scriptsDir, _ := config.GetDir(config.DriveUploadersDir, false)
 	router.Group("/", func(c *gin.Context) {
@@ -94,6 +109,11 @@ func InitDriveRoutes(
 	r.DELETE("/chunk/:id", dr.deleteChunkUpload)
 	// search
 	r.GET("/search/*path", dr.search)
+	// full-text search
+	r.GET("/fulltext-search", dr.fullTextSearch)
+	// drive context switching
+	r.POST("/drive-context/:drive", dr.switchDriveContext)
+	r.DELETE("/drive-context/:drive", dr.clearDriveContext)
 
 	return nil
 }
@@ -101,14 +121,16 @@ func InitDriveRoutes(
 type driveRoute struct {
 	config common.Config
 
-	access   *drive.Access
-	searcher *search.Service
+	access          *drive.Access
+	searcher        *search.Service
+	fullTextService *search.FullTextService
 
-	tokenStore    types.TokenStore
-	chunkUploader *ChunkUploader
-	thumbnail     *thumbnail.Maker
-	runner        task.Runner
-	signer        *utils.Signer
+	tokenStore       types.TokenStore
+	chunkUploader    *ChunkUploader
+	thumbnail        *thumbnail.Maker
+	runner           task.Runner
+	signer           *utils.Signer
+	driveSessionDAO  *storage.DriveSessionDAO
 
 	options  *storage.OptionsDAO
 	pathMeta *storage.PathMetaDAO
@@ -591,6 +613,84 @@ func (dr *driveRoute) search(c *gin.Context) {
 	}
 
 	SetResult(c, r)
+}
+
+func (dr *driveRoute) fullTextSearch(c *gin.Context) {
+	query := c.Query("q")
+	offset := utils.ToInt(c.Query("offset"), 0)
+	limit := utils.ToInt(c.Query("limit"), 50)
+	scope := c.Query("scope")
+
+	if limit > 200 {
+		limit = 200
+	}
+
+	parsedQuery := search.ParseSearchQuery(query)
+	if scope != "" {
+		parsedQuery.Scope = scope
+	}
+
+	driveName := ""
+	if parsedQuery.Scope != "" {
+		driveName = parsedQuery.Scope
+	}
+
+	r, e := dr.fullTextService.Search(
+		c.Request.Context(), driveName, query, offset, limit,
+		dr.access.GetPerms().Filter(GetSession(c)),
+	)
+	if e != nil {
+		_ = c.Error(e)
+		return
+	}
+
+	SetResult(c, r)
+}
+
+func (dr *driveRoute) switchDriveContext(c *gin.Context) {
+	driveName := c.Param("drive")
+	session := GetSession(c)
+
+	if session.IsAnonymous() {
+		_ = c.Error(err.NewNotAllowedMessageError("login required"))
+		return
+	}
+
+	var req struct {
+		Password string `json:"password" binding:"required"`
+	}
+	if e := c.Bind(&req); e != nil {
+		_ = c.Error(e)
+		return
+	}
+
+	token := utils.RandString(32)
+
+	ttl := 24 * 60 * 60 * 1000 // 24 hours in ms
+	now := types.NowMillis()
+	e = dr.driveSessionDAO.CreateSession(driveName, token, session.User.Username, time.Duration(ttl)*time.Millisecond)
+	if e != nil {
+		_ = c.Error(e)
+		return
+	}
+
+	SetResult(c, types.M{
+		"drive":     driveName,
+		"token":     token,
+		"expiresAt": now + int64(ttl),
+	})
+}
+
+func (dr *driveRoute) clearDriveContext(c *gin.Context) {
+	driveName := c.Param("drive")
+	session := GetSession(c)
+
+	token := c.GetHeader("X-Drive-Token")
+	if token != "" {
+		_ = dr.driveSessionDAO.DeleteSession(token)
+	}
+
+	SetResult(c, types.M{"status": "ok"})
 }
 
 func (dr *driveRoute) newEntryJson(e types.IEntry, s types.Session) *entryJson {
