@@ -18,6 +18,7 @@ import (
 	"go-drive/drive"
 	"go-drive/server"
 	"go-drive/server/job"
+	mp "go-drive/server/mount_permission"
 	"go-drive/server/search"
 	"go-drive/server/thumbnail"
 	"go-drive/storage"
@@ -55,6 +56,22 @@ func Initialize(ctx context.Context, ch *registry.ComponentsHolder) (*gin.Engine
 	if err != nil {
 		return nil, err
 	}
+	indexJobStateDAO := storage.NewIndexJobStateDAO(db, ch)
+	fullTextIndexDAO := storage.NewFullTextIndexDAO(db, ch)
+	fullTextService := search.NewFullTextService(ch, rootDrive, tunnyRunner, fullTextIndexDAO, indexJobStateDAO)
+	pathMountRuleDAO := storage.NewPathMountRuleDAO(db, ch)
+	mountPermService := mp.NewMountPermissionService(ch, pathMountRuleDAO)
+	jobHistoryDAO := storage.NewJobHistoryDAO(db, ch)
+	jobRetryConfigDAO := storage.NewJobRetryConfigDAO(db, ch)
+	jobDAO := storage.NewJobDAO(db, ch)
+	jobExecutor, err := job.NewJobExecutor(jobDAO, jobHistoryDAO, jobRetryConfigDAO, ch)
+	if err != nil {
+		return nil, err
+	}
+	jobHistoryService, err := job.NewJobHistoryService(ch, config, tunnyRunner, jobHistoryDAO, jobRetryConfigDAO, jobExecutor)
+	if err != nil {
+		return nil, err
+	}
 	fileTokenStore, err := server.NewFileTokenStore(config, ch)
 	if err != nil {
 		return nil, err
@@ -70,27 +87,13 @@ func Initialize(ctx context.Context, ch *registry.ComponentsHolder) (*gin.Engine
 	}
 	userDAO := storage.NewUserDAO(db, ch)
 	groupDAO := storage.NewGroupDAO(db, ch)
-	jobDAO := storage.NewJobDAO(db, ch)
-	fileBucketDAO := storage.NewFileBucketDAO(db, ch)
-	indexJobStateDAO := storage.NewIndexJobStateDAO(db, ch)
 	driveSessionDAO := storage.NewDriveSessionDAO(db, ch)
-	fullTextIndexDAO := storage.NewFullTextIndexDAO(db, ch)
-	pathMountRuleDAO := storage.NewPathMountRuleDAO(db, ch)
-	jobHistoryDAO := storage.NewJobHistoryDAO(db, ch)
-	jobRetryConfigDAO := storage.NewJobRetryConfigDAO(db, ch)
-	jobExecutor, err := job.NewJobExecutor(jobDAO, jobHistoryDAO, jobRetryConfigDAO, ch)
-	if err != nil {
-		return nil, err
-	}
-	_, err = job.NewJobHistoryService(ch, config, tunnyRunner, jobHistoryDAO, jobRetryConfigDAO, jobExecutor)
-	if err != nil {
-		return nil, err
-	}
+	fileBucketDAO := storage.NewFileBucketDAO(db, ch)
 	fileMessageSource, err := i18n.NewFileMessageSource(config)
 	if err != nil {
 		return nil, err
 	}
-	engine, err := server.InitServer(config, ch, bus, rootDrive, access, service, fileTokenStore, maker, signer, chunkUploader, tunnyRunner, optionsDAO, userDAO, groupDAO, driveDAO, driveDataDAO, pathPermissionDAO, pathMountDAO, pathMetaDAO, jobDAO, fileBucketDAO, jobExecutor, fileMessageSource)
+	engine, err := server.InitServer(config, ch, bus, rootDrive, access, service, fullTextService, mountPermService, jobHistoryService, fileTokenStore, maker, signer, chunkUploader, tunnyRunner, optionsDAO, userDAO, groupDAO, driveDAO, driveDataDAO, pathPermissionDAO, pathMountDAO, pathMountRuleDAO, pathMetaDAO, jobDAO, jobHistoryDAO, jobRetryConfigDAO, fullTextIndexDAO, indexJobStateDAO, driveSessionDAO, fileBucketDAO, jobExecutor, fileMessageSource)
 	if err != nil {
 		return nil, err
 	}

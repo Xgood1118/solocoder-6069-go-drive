@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultMaxContentSize = 10 * 1024 * 1024 // 10MB
-	indexBatchSize        = 100
+	defaultMaxContentSize    = 10 * 1024 * 1024
+	fullTextIndexBatchSize   = 100
 )
 
 type FullTextService struct {
@@ -127,22 +127,23 @@ func (s *FullTextService) buildIndex(ctx types.TaskCtx, driveName string, force 
 		return err
 	}
 
-	driveInstance, err := s.rootDrive.GetDrive(driveName)
-	if err != nil {
-		s.jobStateDAO.UpdateStatus(driveName, types.IndexStatusFailed, err.Error())
-		return fmt.Errorf("failed to get drive %s: %w", driveName, err)
-	}
+	dispatcher := s.rootDrive.Get()
 
-	startPath := ""
+	rootPath := driveName + "/"
+	startPath := rootPath
 	if state.CurrentPath != "" {
-		startPath = state.CurrentPath
+		if !strings.HasPrefix(state.CurrentPath, rootPath) {
+			startPath = rootPath + strings.TrimPrefix(state.CurrentPath, "/")
+		} else {
+			startPath = state.CurrentPath
+		}
 	}
 
 	ctx.Total(state.TotalFiles, true)
 	ctx.Progress(state.ScannedFiles, true)
 
 	walked := make(map[string]bool)
-	batch := make([]types.IEntry, 0, indexBatchSize)
+	batch := make([]types.IEntry, 0, fullTextIndexBatchSize)
 
 	processBatch := func() error {
 		if len(batch) == 0 {
@@ -179,7 +180,7 @@ func (s *FullTextService) buildIndex(ctx types.TaskCtx, driveName string, force 
 		return nil
 	}
 
-	err = s.walkDrive(ctx, driveInstance, startPath, func(entry types.IEntry) error {
+	err = s.walkDrive(ctx, dispatcher, startPath, func(entry types.IEntry) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -192,7 +193,7 @@ func (s *FullTextService) buildIndex(ctx types.TaskCtx, driveName string, force 
 
 		if entry.Type() == types.TypeFile {
 			batch = append(batch, entry)
-			if len(batch) >= indexBatchSize {
+			if len(batch) >= fullTextIndexBatchSize {
 				if err := processBatch(); err != nil {
 					return err
 				}
@@ -222,7 +223,13 @@ func (s *FullTextService) buildIndex(ctx types.TaskCtx, driveName string, force 
 }
 
 func (s *FullTextService) indexEntry(ctx context.Context, driveName string, entry types.IEntry, force bool) error {
-	pathHash := types.HashPath(driveName, entry.Path())
+	entryPath := entry.Path()
+	prefix := driveName + "/"
+	if strings.HasPrefix(entryPath, prefix) {
+		entryPath = strings.TrimPrefix(entryPath, prefix)
+	}
+
+	pathHash := types.HashPath(driveName, entryPath)
 
 	existing, err := s.ftIndexDAO.GetByPathHash(pathHash)
 	if err == nil && existing != nil {
@@ -236,8 +243,8 @@ func (s *FullTextService) indexEntry(ctx context.Context, driveName string, entr
 	ftIndex := &types.FullTextIndex{
 		Drive:         driveName,
 		PathHash:      pathHash,
-		Path:          entry.Path(),
-		Name:          filepath.Base(entry.Path()),
+		Path:          entryPath,
+		Name:          filepath.Base(entryPath),
 		Ext:           utils.PathExt(entry.Name()),
 		MimeType:      mimeType,
 		Size:          entry.Size(),

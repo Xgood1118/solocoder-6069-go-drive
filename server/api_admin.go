@@ -13,6 +13,7 @@ import (
 	mp "go-drive/server/mount_permission"
 	"go-drive/server/search"
 	"go-drive/storage"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -134,15 +135,14 @@ func InitAdminRoutes(
 	mpr := &mountPermRoute{mountPermService, pathMountRuleDAO, rootDrive}
 	// get permission tree
 	r.GET("/mount-permissions/tree/:drive", mpr.getPermissionTree)
+	// get effective permissions — routed via getPermissions when path starts with /effective
+	// (separate catch-all route conflicts with /*path in the same group)
 	// get permissions by path
 	r.GET("/mount-permissions/:drive/*path", mpr.getPermissions)
 	// save permissions
 	r.PUT("/mount-permissions/:drive/*path", mpr.savePermissions)
 	// delete permissions
 	r.DELETE("/mount-permissions/:drive/*path", mpr.deletePermissions)
-	// get effective permissions
-	r.GET("/mount-permissions/:drive/effective/*path", mpr.getEffectivePermissions)
-
 	// Job history management routes
 	jhr := &jobHistoryRoute{jobHistoryService, jobHistoryDAO, jobRetryConfigDAO, jobExecutor, runner}
 	// get job history
@@ -319,6 +319,12 @@ func (r *mountPermRoute) getPermissionTree(c *gin.Context) {
 func (r *mountPermRoute) getPermissions(c *gin.Context) {
 	driveName := c.Param("drive")
 	path := utils.CleanPath(c.Param("path"))
+	// Delegate to getEffectivePermissions when path starts with /effective
+	// (Gin tree cannot have both :drive/effective/*path and :drive/*path registered)
+	if strings.HasPrefix(path, "/effective") {
+		r.getEffectivePermissions(c)
+		return
+	}
 	rules, err := r.ruleDAO.GetByPath(driveName, path)
 	if err != nil {
 		_ = c.Error(err)
@@ -502,11 +508,12 @@ func (r *jobHistoryRoute) saveRetryConfig(c *gin.Context) {
 	}
 	config.JobId = jobId
 
-	if err := r.retryDAO.Save(config); err != nil {
-		_ = c.Error(err)
+	saved, e := r.retryDAO.Save(config)
+	if e != nil {
+		_ = c.Error(e)
 		return
 	}
-	SetResult(c, config)
+	SetResult(c, saved)
 }
 
 func (r *jobHistoryRoute) deleteRetryConfig(c *gin.Context) {

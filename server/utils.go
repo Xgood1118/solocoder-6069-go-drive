@@ -108,13 +108,21 @@ func TokenAuthWithPostParams(tokenStore types.TokenStore) gin.HandlerFunc {
 		if t != "" {
 			return t
 		}
-		return c.GetHeader(common.HeaderAuth)
+		auth := c.GetHeader(common.HeaderAuth)
+		if strings.HasPrefix(auth, "Bearer ") {
+			return auth[7:]
+		}
+		return auth
 	})
 }
 
 func TokenAuth(tokenStore types.TokenStore) gin.HandlerFunc {
 	return tokenAuth(tokenStore, func(c *gin.Context) string {
-		return c.GetHeader(common.HeaderAuth)
+		auth := c.GetHeader(common.HeaderAuth)
+		if strings.HasPrefix(auth, "Bearer ") {
+			return auth[7:]
+		}
+		return auth
 	})
 }
 

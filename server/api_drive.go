@@ -666,10 +666,9 @@ func (dr *driveRoute) switchDriveContext(c *gin.Context) {
 
 	token := utils.RandString(32)
 
-	ttl := 24 * 60 * 60 * 1000 // 24 hours in ms
+	ttl := 24 * 60 * 60 * 1000
 	now := types.NowMillis()
-	e = dr.driveSessionDAO.CreateSession(driveName, token, session.User.Username, time.Duration(ttl)*time.Millisecond)
-	if e != nil {
+	if _, e := dr.driveSessionDAO.CreateSession(driveName, token, session.User.Username, time.Duration(ttl)*time.Millisecond); e != nil {
 		_ = c.Error(e)
 		return
 	}
@@ -682,8 +681,7 @@ func (dr *driveRoute) switchDriveContext(c *gin.Context) {
 }
 
 func (dr *driveRoute) clearDriveContext(c *gin.Context) {
-	driveName := c.Param("drive")
-	session := GetSession(c)
+	_ = c.Param("drive")
 
 	token := c.GetHeader("X-Drive-Token")
 	if token != "" {

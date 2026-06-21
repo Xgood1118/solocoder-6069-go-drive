@@ -19,6 +19,8 @@ Thumbs.db
 .env.local
 *.pem
 *.key
+config.yml
+sessions/
 
 # ── Node / Frontend ──
 node_modules/
@@ -53,6 +55,7 @@ hs_err_pid*.log
 
 # ── Go ──
 vendor/
+*.exe
 
 # ── Python ──
 __pycache__/
