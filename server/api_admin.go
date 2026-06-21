@@ -319,9 +319,10 @@ func (r *mountPermRoute) getPermissionTree(c *gin.Context) {
 func (r *mountPermRoute) getPermissions(c *gin.Context) {
 	driveName := c.Param("drive")
 	path := utils.CleanPath(c.Param("path"))
-	// Delegate to getEffectivePermissions when path starts with /effective
+	// Delegate to getEffectivePermissions when path starts with "effective/"
 	// (Gin tree cannot have both :drive/effective/*path and :drive/*path registered)
-	if path == "/effective" || strings.HasPrefix(path, "/effective/") {
+	// Note: utils.CleanPath strips leading "/", so "effective" not "/effective"
+	if path == "effective" || strings.HasPrefix(path, "effective/") {
 		r.getEffectivePermissions(c)
 		return
 	}
@@ -363,11 +364,12 @@ func (r *mountPermRoute) deletePermissions(c *gin.Context) {
 func (r *mountPermRoute) getEffectivePermissions(c *gin.Context) {
 	driveName := c.Param("drive")
 	path := utils.CleanPath(c.Param("path"))
-	// Strip the "/effective" prefix from the path
-	if path == "/effective" {
-		path = "/"
-	} else if strings.HasPrefix(path, "/effective/") {
-		path = strings.TrimPrefix(path, "/effective")
+	// Strip the "effective" prefix from the path
+	// Note: utils.CleanPath strips leading "/", so "effective" not "/effective"
+	if path == "effective" {
+		path = ""
+	} else if strings.HasPrefix(path, "effective/") {
+		path = strings.TrimPrefix(path, "effective/")
 	}
 	session := GetSession(c)
 
