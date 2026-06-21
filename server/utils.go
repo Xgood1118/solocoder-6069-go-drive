@@ -101,6 +101,17 @@ func MakeSignature(signer *utils.Signer, path, username string, ttl time.Duratio
 	return signature + "." + utils.Base64URLEncode([]byte(username))
 }
 
+func extractBearerToken(auth string) string {
+	if auth == "" {
+		return ""
+	}
+	parts := strings.SplitN(auth, " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		return parts[1]
+	}
+	return auth
+}
+
 // TokenAuthWithPostParams get token from Header or FormData
 func TokenAuthWithPostParams(tokenStore types.TokenStore) gin.HandlerFunc {
 	return tokenAuth(tokenStore, func(c *gin.Context) string {
@@ -109,20 +120,14 @@ func TokenAuthWithPostParams(tokenStore types.TokenStore) gin.HandlerFunc {
 			return t
 		}
 		auth := c.GetHeader(common.HeaderAuth)
-		if strings.HasPrefix(auth, "Bearer ") {
-			return auth[7:]
-		}
-		return auth
+		return extractBearerToken(auth)
 	})
 }
 
 func TokenAuth(tokenStore types.TokenStore) gin.HandlerFunc {
 	return tokenAuth(tokenStore, func(c *gin.Context) string {
 		auth := c.GetHeader(common.HeaderAuth)
-		if strings.HasPrefix(auth, "Bearer ") {
-			return auth[7:]
-		}
-		return auth
+		return extractBearerToken(auth)
 	})
 }
 
